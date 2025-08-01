@@ -6,7 +6,7 @@ This repo contains minimal code to create that environment. It is a FastAPI-base
 
 Fork, clone, and modify as you wish.
 
-**How I use it?:** This is a minimal environment that I use for my research projects involving LLM code.
+**How I use it?** This is a minimal environment that I use for my research projects involving LLM code.
 
 ## Quick Start
 
