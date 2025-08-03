@@ -54,15 +54,27 @@ async def execute_code(request_body: dict):
         _ = [local_dict.pop(key) for key in remove_keys]
         return JSONResponse(content={'result': local_dict, 'success': True})
     except Exception as e:
-        error_info = {
-            'error': str(e),
-            'error_type': type(e).__name__,
-            'traceback': traceback.format_exc(),
-            'success': False
-        }
-        logger.error(f"❌ Code execution failed: {type(e).__name__}: {str(e)}")
-        logger.error(f"Traceback: {error_info['traceback']}")
-        return JSONResponse(
-            status_code=400,
-            content=error_info
-        )
+        try:
+            error_info = {
+                'error': str(e),
+                'error_type': type(e).__name__,
+                'traceback': traceback.format_exc(),
+                'success': False
+            }
+            logger.error(f"❌ Code execution failed: {type(e).__name__}: {str(e)}")
+            logger.error(f"Traceback: {error_info['traceback']}")
+            return JSONResponse(
+                status_code=400,
+                content=error_info
+            )
+        except Exception as handler_error:
+            # Fallback error response if error handling itself fails
+            logger.error(f"Error handler failed: {handler_error}")
+            return JSONResponse(
+                status_code=500,
+                content={
+                    'error': 'Internal server error during error handling',
+                    'original_error': str(e),
+                    'success': False
+                }
+            )

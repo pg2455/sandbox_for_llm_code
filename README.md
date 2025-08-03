@@ -120,27 +120,103 @@ This step downloads the Docker image from the registry, squashes it into a singl
 #SBATCH --mem=8G
 #SBATCH -J code-sandbox-test
 
-module load apptainer
+# Use dynamic port to avoid conflicts when multiple jobs run on same node
+# Use SLURM_LOCALID (0-based index within node) for guaranteed uniqueness
+PORT=$((1729 + SLURM_LOCALID))
+echo "Using port: $PORT for job $SLURM_JOB_ID (local ID: $SLURM_LOCALID)"
 
-echo "Starting uvicorn server..."
+
+module purge
+module load apptainer 
+
+# Start uvicorn server in background
+echo "Starting uvicorn server on port $PORT..."
 apptainer exec \
-    --writable-tmpfs \
-    sandbox_for_llm_code.sif \
-    bash -c "cd /app && export LOG_FILE=/tmp/app.log && uvicorn main:app --host 0.0.0.0 --port 1729" &
-UVICORN_PID=$!
+   --writable-tmpfs \
+   sandbox_for_llm_code.sif \
+   bash -c "cd /app && export LOG_FILE=/tmp/app.log && uvicorn main:app --host 0.0.0.0 --port $PORT" > /ptmp/$USER/slurm_jobs/uvicorn.${SLURM_JOB_ID}.log 2>&1 &
+APPTAINER_PID=$!
+echo "Started apptainer process: $APPTAINER_PID"
 
-echo "Checking uvicorn status..."
-ps aux | grep uvicorn
-netstat -tuln | grep 1729
+# Wait a moment for uvicorn to start inside container
+sleep 3
 
-sleep 5                          # give the server a moment
-python example.py                # talks to http://0.0.0.1:1729
-
-# Clean up uvicorn when done
-if [ ! -z "$UVICORN_PID" ]; then
-    echo "Stopping uvicorn server..."
-    kill $UVICORN_PID
+# Check if apptainer process is still running
+if ! kill -0 $APPTAINER_PID 2>/dev/null; then
+   echo "ERROR: Apptainer process died unexpectedly"
+   echo "Check uvicorn logs: /ptmp/$USER/slurm_jobs/uvicorn.${SLURM_JOB_ID}.log"
+   exit 1
 fi
+echo "Apptainer process is running: $APPTAINER_PID"
+
+# Wait for uvicorn to be ready to accept requests
+echo "Waiting for uvicorn server to be ready..."
+max_attempts=30
+attempt=0
+server_ready=false
+
+while [ $attempt -lt $max_attempts ] && [ "$server_ready" = false ]; do
+   attempt=$((attempt + 1))
+   echo "Attempt $attempt/$max_attempts: Checking if server is ready..."
+   
+   # Check if apptainer process is still running
+   if ! kill -0 $APPTAINER_PID 2>/dev/null; then
+      echo "ERROR: Apptainer process died unexpectedly"
+      echo "Check uvicorn logs: /ptmp/$USER/slurm_jobs/uvicorn.${SLURM_JOB_ID}.log"
+      exit 1
+   fi
+   
+   # Check if port is listening
+   if netstat -tuln | grep -q ":${PORT} "; then
+      echo "Port ${PORT} is listening"
+      
+      # Test if the server actually responds
+      if curl -s --max-time 5 http://localhost:${PORT}/execute_code/ -X POST -H "Content-Type: application/json" -d '{"code": "print(\"test\")", "local_dict": {}}' >/dev/null 2>&1; then
+            echo "SUCCESS: Uvicorn server is ready and responding to requests!"
+            server_ready=true
+      else
+            echo "Port is listening but server not responding yet..."
+      fi
+   else
+      echo "Port ${PORT} not yet listening..."
+   fi
+   
+   if [ "$server_ready" = false ]; then
+      sleep 2
+   fi
+done
+
+if [ "$server_ready" = false ]; then
+   echo "ERROR: Uvicorn server failed to start within $((max_attempts * 2)) seconds"
+   echo "Apptainer process status:"
+   ps aux | grep $APPTAINER_PID
+   echo "Port status:"
+   netstat -tuln | grep ${PORT}
+   echo "Available ports:"
+   netstat -tuln | grep LISTEN
+   exit 1 # kill this job
+fi
+
+echo "Uvicorn server is ready and running on port ${PORT}"
+
+# YOUR SCRIPT GOES HERE --> Pass the port endpoint with the correct port here. 
+python example.py  code_execution_endpoint=http://0.0.0.0:${PORT}/execute_code/
+
+# Capture the exit status of the Python command
+PYTHON_EXIT_STATUS=$?
+
+echo "Python command completed with exit status: $PYTHON_EXIT_STATUS"
+
+# Clean up apptainer when done (only if it was started)
+if [ "$NEED_CODE_EXECUTION" = true ] && [ ! -z "$APPTAINER_PID" ]; then
+    echo "Stopping apptainer process (PID: $APPTAINER_PID)..."
+    kill $APPTAINER_PID 2>/dev/null || true
+fi
+
+# Exit with the same status as the Python command
+# This tells SLURM whether the job succeeded (0) or failed (non-zero)
+echo "Job completed. Exiting with status: $PYTHON_EXIT_STATUS"
+exit $PYTHON_EXIT_STATUS
 ```
 
 ## Acknowledgements
