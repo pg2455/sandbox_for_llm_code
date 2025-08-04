@@ -5,7 +5,7 @@ def demonstrate_successful_execution():
     Demonstrates successful code execution using the API.
     Shows how to execute valid code with proper local variables.
     """
-    url = "http://0.0.0.0:1729"
+    url = "http://localhost:1729"
     
     print("=== Successful Code Execution Examples ===\n")
     
@@ -23,11 +23,15 @@ def demonstrate_successful_execution():
     }
     
     try:
-        response = requests.post(f'{url}/execute_code/', json=payload)
+        response = requests.post(f'{url}/execute_code/', json=payload, timeout=10)
         result = response.json()
         print(f"Result: {result}")
+    except requests.exceptions.ConnectionError:
+        print("❌ Connection refused - server not running")
+    except requests.exceptions.Timeout:
+        print("❌ Request timeout - server not responding")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Error: {e}")
     
     print("\n" + "-"*50 + "\n")
 
@@ -36,7 +40,7 @@ def demonstrate_error_handling():
     Demonstrates error handling in code execution using the API.
     Shows what happens when code contains errors or undefined variables.
     """
-    url = "http://0.0.0.0:1729"
+    url = "http://localhost:1729"  # Use localhost for consistency
     
     print("=== Error Handling Examples ===\n")
     
@@ -54,11 +58,15 @@ def demonstrate_error_handling():
     }
     
     try:
-        response = requests.post(f'{url}/execute_code/', json=payload)
+        response = requests.post(f'{url}/execute_code/', json=payload, timeout=10)
         result = response.json()
         print(f"Result: {result}")
+    except requests.exceptions.ConnectionError:
+        print("❌ Connection refused - server not running")
+    except requests.exceptions.Timeout:
+        print("❌ Request timeout - server not responding")
     except Exception as e:
-        print(f"Error: {e}")
+        print(f"❌ Error: {e}")
     
     print("\n" + "-"*50 + "\n")
 

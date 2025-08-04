@@ -120,11 +120,10 @@ This step downloads the Docker image from the registry, squashes it into a singl
 #SBATCH --mem=8G
 #SBATCH -J code-sandbox-test
 
-# Use dynamic port to avoid conflicts when multiple jobs run on same node
-# Use SLURM_LOCALID (0-based index within node) for guaranteed uniqueness
-PORT=$((1729 + SLURM_LOCALID))
-echo "Using port: $PORT for job $SLURM_JOB_ID (local ID: $SLURM_LOCALID)"
-
+# Assign a dynamic port number to prevent conflicts when multiple jobs are executed on the same node.
+# The port number is derived using SLURM_JOB_ID to ensure uniqueness within the node.
+PORT=$((1729 + (SLURM_JOB_ID % 100)))
+echo "Using port: $PORT for job $SLURM_JOB_ID"
 
 module purge
 module load apptainer 
@@ -200,7 +199,7 @@ fi
 echo "Uvicorn server is ready and running on port ${PORT}"
 
 # YOUR SCRIPT GOES HERE --> Pass the port endpoint with the correct port here. 
-python example.py  code_execution_endpoint=http://0.0.0.0:${PORT}/execute_code/
+python example.py  code_execution_endpoint=http://localhost:${PORT}/execute_code/
 
 # Capture the exit status of the Python command
 PYTHON_EXIT_STATUS=$?

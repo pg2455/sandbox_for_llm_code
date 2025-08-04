@@ -16,6 +16,16 @@ app = FastAPI()
 
 global_dict = {}
 
+@app.get("/")
+async def root():
+    """Root endpoint for basic connectivity test."""
+    return {"message": "Code execution sandbox is running", "status": "healthy"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {"status": "healthy", "service": "code-execution-sandbox"}
+
 @app.post("/execute_code/")
 async def execute_code(request_body: dict):
     """Executes the code in the request_body. 
@@ -52,7 +62,7 @@ async def execute_code(request_body: dict):
                 remove_keys.append(key)
 
         _ = [local_dict.pop(key) for key in remove_keys]
-        return JSONResponse(content={'result': local_dict, 'success': True})
+        return JSONResponse(content={'result': local_dict, 'success': True}, status_code=200)
     except Exception as e:
         try:
             error_info = {
