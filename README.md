@@ -41,7 +41,7 @@ git clone https://github.com/pg2455/sandbox_for_llm_code.git
 
 ## Examples
 
-See `example.py` for some examples.
+See `example.py` for some basic examples and `more_examples.py` for examples on how to use imports in the code.
 
 ## Extension
 
